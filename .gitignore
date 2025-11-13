@@ -1,0 +1,22 @@
+﻿# Node / tools
+node_modules/
+dist/
+.DS_Store
+
+# Local env / config (אם יש סודות)
+client/config.local.js
+client/config.js
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+
+# VS Code
+.vscode/
+
+# Builds זמניים
+*.zip
+
+# CLASP
+# .clasp.json משאירים! (אל תוסיף אותו לכאן)
+.vs/

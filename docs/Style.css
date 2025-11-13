@@ -1,0 +1,336 @@
+﻿/* בסיס */
+:root {
+    --brand: #b254c6;
+    --text: #222;
+    --muted: #6b7280;
+    --bg: #fff;
+    --border: #e5e7eb;
+    --radius: 16px;
+}
+
+* {
+    box-sizing: border-box
+}
+
+body.page {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial,Helvetica,sans-serif;
+    line-height: 1.7
+}
+
+.container {
+    max-width: 1100px;
+    margin-inline: auto;
+    padding: clamp(16px,2vw,24px)
+}
+
+.section {
+    padding-block: clamp(20px,4vw,48px)
+}
+
+h1, h2, h3 {
+    margin: 0 0 .5rem 0
+}
+
+.meta {
+    color: var(--muted);
+    font-size: .9rem
+}
+
+/* Hero */
+.hero {
+    position: relative;
+    color: #fff
+}
+
+.hero-media {
+    position: relative;
+    isolation: isolate
+}
+
+.hero-video {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 0
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.35));
+    pointer-events: none
+}
+
+.hero-copy {
+    position: relative;
+    z-index: 1;
+    text-align: right
+}
+
+.hero .btn {
+    margin-inline: 6px 0;
+    margin-block: 6px
+}
+
+/* כפתורים */
+.btn {
+    display: inline-block;
+    border: 1px solid var(--border);
+    padding: .7rem 1rem;
+    border-radius: 12px;
+    background: #fff;
+    color: #111;
+    cursor: pointer
+}
+
+    .btn:focus-visible {
+        outline: 3px solid #000;
+        outline-offset: 3px
+    }
+
+.btn-primary {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff
+}
+
+.btn-secondary {
+    background: #111;
+    color: #fff
+}
+
+.btn-outline {
+    background: transparent
+}
+
+.btn-whatsapp {
+    background: #25D366;
+    border-color: #25D366;
+    color: #111
+}
+
+/* Techelet (light-blue) button */
+.btn-techelet {
+    background: #5ec2ff; /* תכלת */
+    color: #08354b; /* טקסט כהה לקריאות */
+    border: 2px solid #5ec2ff;
+}
+
+    .btn-techelet:hover,
+    .btn-techelet:focus {
+        background: #3bb3ff; /* כהה קל בהובר */
+        border-color: #3bb3ff;
+    }
+
+/* גרסת outline (לבן עם מסגרת תכלת) – אם תרצה */
+.btn-techelet-outline {
+    background: transparent;
+    color: #0a558c;
+    border: 2px solid #5ec2ff;
+}
+
+    .btn-techelet-outline:hover,
+    .btn-techelet-outline:focus {
+        background: rgba(94,194,255,.12);
+    }
+
+
+
+
+
+
+/* רשת/כרטיסים */
+.grid {
+    display: grid;
+    gap: clamp(12px,2vw,20px)
+}
+
+    .grid.two {
+        grid-template-columns: repeat(2,minmax(0,1fr))
+    }
+
+@media (max-width:720px) {
+    .grid.two {
+        grid-template-columns: 1fr
+    }
+}
+
+.card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #fff
+}
+
+    .card img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        display: block
+    }
+
+    .card h3 {
+        padding: 12px
+    }
+
+/* טפסים */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem
+}
+
+    .field.check {
+        flex-direction: row;
+        align-items: center;
+        gap: .5rem
+    }
+
+label {
+    font-weight: 600
+}
+
+input, select, textarea {
+    padding: .6rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 1rem
+}
+
+    input:focus, select:focus, textarea:focus {
+        outline: 2px solid var(--brand);
+        border-color: var(--brand)
+    }
+
+.error {
+    color: #b00020;
+    min-height: 1.2em
+}
+
+.actions {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    margin-top: .75rem
+}
+
+.form-status {
+    min-height: 1.5em
+}
+
+/* בקרי וידאו */
+.video-controls {
+    position: absolute;
+    inset: auto 16px 16px auto;
+    z-index: 2;
+    display: flex;
+    gap: .5rem
+}
+
+/* קישורי מדיניות בפוטר */
+.legal-links {
+    display: flex;
+    gap: .75rem;
+    flex-wrap: wrap;
+    font-size: .9rem;
+    color: var(--muted)
+}
+
+    .legal-links a {
+        color: inherit;
+        text-decoration: underline
+    }
+
+    .legal-links .sep {
+        opacity: .4
+    }
+
+/* נגישות */
+.skip-link {
+    position: absolute;
+    inset-inline-start: -9999px
+}
+
+    .skip-link:focus {
+        position: fixed;
+        inset-inline-start: 12px;
+        inset-block-start: 12px;
+        background: #111;
+        color: #fff;
+        padding: .5rem .75rem;
+        border-radius: .5rem;
+        z-index: 9999
+    }
+
+/* ================================
+   [EDIT v2.1] Services row layout
+   מציב את כרטיסי התמונות בשורה אחת בדסקטופ,
+   2 עמודות בטאבלט, ועמודה אחת במובייל.
+=================================== */
+.grid.services {
+    display: grid; /* ליתר בטחון אם לא הוגדר קודם */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(12px, 2vw, 20px);
+}
+
+@media (max-width: 900px) {
+    .grid.services {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .grid.services {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================
+   [EDIT v2.1] Hero video – מצב קומפקטי
+   מצמצם את הווידיאו וממרכז אותו.
+   פעיל רק כאשר ל-header יש מחלקה is-compact.
+============================================ */
+.hero.is-compact::after {
+    /* מבטל את חפיית הגרדיאנט הכללית של ה-hero, אם הוגדרה קודם */
+    display: none;
+}
+
+.hero.is-compact .hero-media {
+    position: relative; /* נחוץ ל-::after של החפייה */
+    max-width: 960px; /* ← רוחב הווידיאו בגרסה הקומפקטית */
+    margin-inline: auto; /* ממרכז */
+    border-radius: 16px; /* פינות מעוגלות - כמו במקור */
+    overflow: hidden; /* חיתוך עודפים */
+}
+
+    /* חפיית כהות עדינה רק על הווידיאו עצמו (לא על כל ההֶדר) */
+    .hero.is-compact .hero-media::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.25));
+        pointer-events: none;
+    }
+
+.hero.is-compact .hero-video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0; /* כבר יש עיגול מהקונטיינר */
+}
+
+/* קצת ריווח בין הווידיאו לטקסט */
+.hero.is-compact .hero-copy {
+    margin-top: 12px;
+}
+
+/* ווידוא שמיקום הכפתורים יחסית לקופסת הווידיאו – נשאר בפינה */
+.hero.is-compact .video-controls {
+    position: absolute;
+    inset: auto 16px 16px auto; /* ימין-למטה */
+    z-index: 2;
+}

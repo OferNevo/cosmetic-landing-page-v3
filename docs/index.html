@@ -1,0 +1,222 @@
+﻿<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>מכון יופי — הזמנת תור ומבצעים</title>
+
+    <!-- [UPGRADE v2] SEO -->
+    <link rel="canonical" href="https://ofernevo.github.io/cosmetic-landing-page-v1/" />
+    <meta name="description" content="טיפולי קוסמטיקה: מניקור, פדיקור, בניית ציפורניים, ניקוי פנים ועוד. הזמנת תורים און-ליין ומבצעים חמים." />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="מכון יופי — הזמנת תור ומבצעים" />
+    <meta property="og:description" content="הזמינו תור עכשיו וקבלו הצעות בלעדיות." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ofernevo.github.io/cosmetic-landing-page-v1/" />
+    <meta property="og:image" content="https://ofernevo.github.io/cosmetic-landing-page-v1/assets/images/hero-poster.jpg" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#b254c6" />
+
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body class="page">
+    <a class="skip-link" href="#content">דלג לתוכן</a>
+
+
+    <!-- [EDIT v2.1] header: הוספת המחלקה is-compact כדי לצמצם את רוחב הווידיאו -->
+    <header class="hero is-compact" role="banner" aria-label="וידאו תדמיתי">
+        <div class="hero-media">
+            <video id="heroVideo" class="hero-video" autoplay muted playsinline loop
+                   poster="assets/images/manicure.jpg" aria-label="סרטון תדמית מכון יופי">
+                <source src="assets/video/cosmetic-video-01_1280.webm" type="video/webm" />
+                <source src="assets/video/cosmetic-video-01.mp4" type="video/mp4" />
+                הדפדפן שלך לא תומך בוידיאו. ניתן לצפות בתמונה הסטטית.
+            </video>
+
+            <div class="video-controls" role="group" aria-label="בקרת וידיאו">
+                <button id="videoToggle" class="btn" aria-pressed="false">השהה/נגן</button>
+                <button id="videoMute" class="btn" aria-pressed="true">השתק/בטל השתקה</button>
+            </div>
+        </div>
+
+        <div class="hero-copy container">
+            <h1>יופי שמתחיל כאן</h1>
+            <p>מניקור · פדיקור · בניית ציפורניים · טיפולי פנים ועוד</p>
+            <a class="btn btn-primary" href="#booking" data-track="cta_book_top">הזמנת תור</a>
+            <a class="btn btn-secondary" href="#deals" data-track="cta_deals_top">מבצעים</a>
+            <a class="btn btn-whatsapp" id="waCTA" href="#" data-track="whatsapp_click" aria-label="יצירת קשר בוואטסאפ">ווטסאפ</a>
+            <a class="btn btn-techelet" href="dashboard.html" data-track="cta_dashboard">דשבורד</a>
+
+        </div>
+    </header>
+
+    <main id="content">
+        <section class="section container" id="services">
+            <h2>בחרו טיפול</h2>
+            <div class="grid services">
+                <article class="card"><img loading="lazy" src="assets/images/manicure.jpg" alt="מניקור"><h3>מניקור</h3></article>
+                <article class="card"><img loading="lazy" src="assets/images/pedicure.jpg" alt="פדיקור"><h3>פדיקור</h3></article>
+                <article class="card"><img loading="lazy" src="assets/images/nails-recover.jpg" alt="בניית ציפורניים"><h3>בניית ציפורניים</h3></article>
+                <article class="card"><img loading="lazy" src="assets/images/face.jpg" alt="טיפולי פנים"><h3>טיפולי פנים</h3></article>
+            </div>
+        </section>
+
+        <section class="section container" id="booking" aria-labelledby="bookingTitle">
+            <h2 id="bookingTitle">הזמנה אונליין</h2>
+            <form id="bookingForm" novalidate>
+                <div class="grid two">
+                    <div class="field">
+                        <label for="full_name">שם מלא</label>
+                        <input id="full_name" name="full_name" autocomplete="name" required />
+                        <p class="error" id="err_full_name" role="alert"></p>
+                    </div>
+                    <div class="field">
+                        <label for="phone">טלפון</label>
+                        <input id="phone" name="phone" inputmode="tel" autocomplete="tel" required />
+                        <p class="error" id="err_phone" role="alert"></p>
+                    </div>
+                    <div class="field">
+                        <label for="email">דוא״ל</label>
+                        <input id="email" name="email" type="email" autocomplete="email" />
+                        <p class="error" id="err_email" role="alert"></p>
+                    </div>
+                    <div class="field">
+                        <label for="category">קטגוריה</label>
+                        <select id="category" name="category" required aria-describedby="catHelp">
+                            <option value="">בחרו...</option>
+                            <option value="manicure">מניקור</option>
+                            <option value="pedicure">פדיקור</option>
+                            <option value="nails">בניית ציפורניים</option>
+                            <option value="facial">טיפולי פנים</option>
+                            <option value="wax">שעווה</option>
+                            <option value="brows">גבות/ריסים</option>
+                        </select>
+                        <small class="meta" id="catHelp">בחירה תטען את סוגי הטיפול</small>
+                    </div>
+                    <div class="field">
+                        <label for="service">סוג טיפול</label>
+                        <select id="service" name="service" required>
+                            <option value="">בחרו קטגוריה תחילה</option>
+                        </select>
+                        <p class="meta" id="svcMeta"></p>
+                    </div>
+                    <div class="field">
+                        <label for="date">תאריך מועדף</label>
+                        <input id="date" name="preferred_date" type="date" required />
+                    </div>
+                    <div class="field">
+                        <label for="time">שעה מועדפת</label>
+                        <input id="time" name="preferred_time" type="time" />
+                    </div>
+                    <div class="field">
+                        <label for="notes">הערות</label>
+                        <textarea id="notes" name="notes" rows="2" placeholder="רגישויות, העדפות וכו׳"></textarea>
+                    </div>
+                    <div class="field check">
+                        <input id="consent" name="consent" type="checkbox" required />
+                        <label for="consent">אני מאשר/ת יצירת קשר לצורך התיאום</label>
+                    </div>
+                </div>
+                <input type="hidden" name="utm_source">
+                <input type="hidden" name="utm_medium">
+                <input type="hidden" name="utm_campaign">
+                <input type="hidden" name="page">
+                <div class="actions">
+                    <button class="btn btn-primary" type="submit">שליחת בקשה</button>
+                    <button class="btn btn-outline" type="button" id="waFromForm">שלח בוואטסאפ</button>
+                    <p class="form-status" id="bookStatus" aria-live="polite"></p>
+                </div>
+            </form>
+        </section>
+
+        <section class="section container" id="deals" aria-labelledby="dealsTitle">
+            <h2 id="dealsTitle">מבצעים ועדכונים</h2>
+            <form id="leadForm" novalidate>
+                <div class="grid two">
+                    <div class="field">
+                        <label for="lead_name">שם</label>
+                        <input id="lead_name" name="full_name" required />
+                    </div>
+                    <div class="field">
+                        <label for="lead_phone">טלפון</label>
+                        <input id="lead_phone" name="phone" inputmode="tel" required />
+                    </div>
+                    <div class="field">
+                        <label for="lead_email">דוא״ל</label>
+                        <input id="lead_email" name="email" type="email" />
+                    </div>
+                    <div class="field check">
+                        <input id="lead_ok" name="consent" type="checkbox" required />
+                        <label for="lead_ok">מאשר/ת קבלת מבצעים ועדכונים</label>
+                    </div>
+                </div>
+                <input type="hidden" name="utm_source">
+                <input type="hidden" name="utm_medium">
+                <input type="hidden" name="utm_campaign">
+                <input type="hidden" name="page">
+                <div class="actions">
+                    <button class="btn btn-primary" type="submit">שליחה</button>
+                    <p class="form-status" id="leadStatus" aria-live="polite"></p>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <!--<footer class="section">
+        <div class="container">
+            < [UPGRADE v2] Footer partial mount >
+            <div id="legal-links"></div>
+            <p class="meta">© כל הזכויות שמורות.</p>
+        </div>
+    </footer>-->
+    <script src="exec-url.js"></script>
+    <script src="config.js" defer></script>
+    <script src="script.js" defer></script>
+
+    <!-- [UPGRADE v2] Load footer partial once for all pages -->
+    <!--<script>
+        (async () => {
+            try {
+                const html = await (await fetch('partials/footer-links.html', { cache: 'no-cache' })).text();
+                document.getElementById('legal-links').innerHTML = html;
+            } catch (e) { console.warn('footer load failed', e); }
+        })();
+    </script>-->
+    <!-- ... התוכן של הדף ... -->
+    <!-- CONFIG: כתובת ה-Web App -->
+    <!-- סקריפטים של האתר (אם יש) חייבים להגיע אחרי ה-APP_CONFIG -->
+    <!--<script src="./assets/js/main.js"></script>-->
+
+    <footer class="section">
+        <div class="container">
+            <div id="legal-links"></div>
+            <p class="meta">© כל הזכויות שמורות.</p>
+        </div>
+    </footer>
+
+    <!-- טוען את ה-partial לפוטר; עם נפילה/file:// מציב תוכן חלופי -->
+    <script>
+        (async () => {
+            const mount = document.getElementById('legal-links');
+            if (!mount) return;
+
+            if (location.protocol === 'file:') {
+                mount.innerHTML = '<a href="accessibility.html">הצהרת נגישות</a> • <a href="privacy.html">מדיניות פרטיות</a> • <a href="terms.html">תנאי שימוש</a>';
+                return;
+            }
+
+            try {
+                const res = await fetch('partials/footer-links.html', { cache: 'no-cache' });
+                const html = await res.text();
+                mount.innerHTML = html;
+            } catch (e) {
+                console.warn('footer load failed', e);
+                mount.innerHTML = '<a href="accessibility.html">הצהרת נגישות</a> • <a href="privacy.html">מדיניות פרטיות</a> • <a href="terms.html">תנאי שימוש</a>';
+            }
+        })();
+    </script>
+</body>
+</html>

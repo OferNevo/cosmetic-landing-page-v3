@@ -1,0 +1,1958 @@
+﻿<!-- Start of version split GET and Post 04-11-2025-->
+<!--  version 12-10-25 ver03 • READER GET SPLIT -->
+
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: .85rem
+        }
+
+        .ok {
+            background: #e6f6ec;
+            border: 1px solid #b7e2c2
+        }
+
+        .err {
+            background: #fdecea;
+            border: 1px solid #f5c2c0
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+            <span id="ep" class="badge muted" title="Endpoint in use"></span>
+            <span id="ping" class="badge muted" title="Server status"></span>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script (Reader) ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="field">
+                <label for="from">מתאריך (YYYY-MM-DD)</label>
+                <input id="from" type="date" />
+            </div>
+            <div class="field">
+                <label for="to">עד תאריך (YYYY-MM-DD)</label>
+                <input id="to" type="date" />
+            </div>
+            <div class="field">
+                <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+                <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+            </div>
+            <div class="field">
+                <button id="load" class="btn btn-techelet">טען</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+            <div class="stat">ימים שונים: <b id="days">0</b></div>
+            <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrap">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="nowrap">תאריך</th>
+                        <th class="nowrap">שעה</th>
+                        <th>שם</th>
+                        <th>קטגוריה</th>
+                        <th>טיפול</th>
+                        <th>טלפון</th>
+                        <th class="right">דוא״ל</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Status -->
+        <p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    </main>
+
+    <!-- ===== SCRIPTS (Reader GET) ===== -->
+    <script>
+        // GET: כתובת ה-Reader (Web App חדש שמשרת רק doGet)
+        // TODO: החלף לכתובת ה-exec של פרויקט ה-Reader שלך:
+        const EXEC_URL_GET = "https://script.google.com/macros/s/AKfycbzi5IjzUNT-CH_7_xhhK-iVnaXQQxKdJlY20qRmAnTvA-l-7BpHGdliJ5LGZzMdQPU9hQ/exec";
+
+        // מציגים את ה-URL בדשבורד (עוזר לדיבוג)
+        document.addEventListener('DOMContentLoaded', () => {
+            const ep = document.getElementById('ep');
+            ep.textContent = EXEC_URL_GET.replace(/^https?:\/\//, '');
+            ep.className = 'badge';
+        });
+
+        // ---------- Utilities ----------
+        function fmtDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        function defaultRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return { from: fmtDate(start), to: fmtDate(end) };
+        }
+
+        // בדיקת בריאות ה-Reader – שולח ?action=status עם שבירת קאש
+        async function pingStatus() {
+            const badge = document.getElementById('ping');
+            try {
+                const r = await fetch(`${EXEC_URL_GET}?action=status&v=${Date.now()}`, { cache: 'no-store', redirect: 'follow' });
+                const t = await r.text();
+                badge.textContent = r.ok ? 'Reader OK' : ('HTTP ' + r.status);
+                badge.className = 'badge ' + (r.ok ? 'ok' : 'err');
+                console.log('STATUS →', t);
+            } catch (e) {
+                badge.textContent = 'Status error';
+                badge.className = 'badge err';
+                console.warn('STATUS error', e);
+            }
+        }
+
+        // קריאת רשומות — GET ל-Reader עם שבירת קאש
+        async function fetchBookings(from, to) {
+            const url = `${EXEC_URL_GET}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&v=${Date.now()}`;
+            console.log('→ GET', url);
+            const res = await fetch(url, { method: 'GET', cache: 'no-store', redirect: 'follow' });
+            const text = await res.text();
+            console.log('BOOKINGS raw:', text);
+            if (!res.ok) throw new Error('GET failed: ' + res.status);
+            let data;
+            try { data = JSON.parse(text); }
+            catch (e) { throw new Error('Bad JSON from server: ' + e.message + ' | body=' + text); }
+            return data; // מצופה: { ok:true, items:[...] }
+        }
+
+        function render(items) {
+            const q = document.getElementById('q').value.trim().toLowerCase();
+            const filtered = q ? items.filter(it => {
+                const hay = [
+                    it.full_name || '',
+                    it.service_name || it.service || '',
+                    it.phone || '',
+                    it.category || '',
+                    it.email || ''
+                ].join(' ').toLowerCase();
+                return hay.includes(q);
+            }) : items;
+
+            const tbody = document.querySelector('#tbl tbody');
+            tbody.innerHTML = filtered.map(it => {
+                const d = it.preferred_date || '';
+                const t = it.preferred_time || '';
+                const n = it.full_name || '';
+                const c = it.category || '';
+                const s = it.service_name || it.service || '';
+                const p = it.phone || '';
+                const e = it.email || '';
+                return `<tr>
+                      <td class="nowrap">${d}</td>
+                      <td class="nowrap">${t}</td>
+                      <td>${n}</td>
+                      <td>${c}</td>
+                      <td>${s}</td>
+                      <td>${p}</td>
+                      <td class="right">${e}</td>
+                    </tr>`;
+            }).join('');
+
+            document.getElementById('count').textContent = String(filtered.length);
+            const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+            document.getElementById('days').textContent = String(daySet.size);
+            const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+            document.getElementById('cats').textContent = String(catSet.size);
+        }
+
+        // זרימת הפעלה — קודם ping, אחר כך Bind, לטעון רק בלחיצה
+        document.addEventListener('DOMContentLoaded', async () => {
+            await pingStatus();
+
+            const { from, to } = defaultRange();
+            document.getElementById('from').value = from;
+            document.getElementById('to').value = to;
+
+            document.getElementById('load').addEventListener('click', async () => {
+                const s = document.getElementById('status');
+                s.textContent = 'טוען נתונים...';
+                try {
+                    const data = await fetchBookings(
+                        document.getElementById('from').value || '',
+                        document.getElementById('to').value || ''
+                    );
+                    if (!data || !data.ok || !Array.isArray(data.items)) {
+                        s.textContent = 'שרת החזיר תשובה לא צפויה (ראה Console).';
+                        console.warn('Unexpected payload:', data);
+                        return;
+                    }
+                    render(data.items);
+                    s.textContent = `נטענו ${data.items.length} רשומות.`;
+                } catch (err) {
+                    console.warn(err);
+                    s.textContent = 'שגיאה בטעינת הנתונים (בדוק doGet?action=bookings / פריסה / הרשאות).';
+                }
+            });
+
+            // ללא טעינה אוטומטית בעת פתיחת הדף
+            // document.getElementById('load').click();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+<!-- End of version split Get and POst 04-11-2025-->
+<!--  version 12-10-25 ver03 -->
+<!--
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: .85rem
+        }
+
+        .ok {
+            background: #e6f6ec;
+            border: 1px solid #b7e2c2
+        }
+
+        .err {
+            background: #fdecea;
+            border: 1px solid #f5c2c0
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+            <span id="ep" class="badge muted" title="Endpoint in use"></span>
+            <span id="ping" class="badge muted" title="Server status"></span>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+        <!-- Filters -->
+<!--
+
+<div class="filters">
+    <div class="field">
+        <label for="from">מתאריך (YYYY-MM-DD)</label>
+        <input id="from" type="date" />
+    </div>
+    <div class="field">
+        <label for="to">עד תאריך (YYYY-MM-DD)</label>
+        <input id="to" type="date" />
+    </div>
+    <div class="field">
+        <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+        <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+    </div>
+    <div class="field">
+        <button id="load" class="btn btn-techelet">טען</button>
+    </div>
+</div>
+
+<!-- Stats -->
+<!--
+<div class="stats">
+    <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+    <div class="stat">ימים שונים: <b id="days">0</b></div>
+    <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+</div>
+
+<!-- Table -->
+<!--
+<div class="table-wrap">
+    <table id="tbl" class="table">
+        <thead>
+            <tr>
+                <th class="nowrap">תאריך</th>
+                <th class="nowrap">שעה</th>
+                <th>שם</th>
+                <th>קטגוריה</th>
+                <th>טיפול</th>
+                <th>טלפון</th>
+                <th class="right">דוא״ל</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Status -->
+<!--
+<p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    </main>
+
+
+
+<!-- ===== CHANGES AREA (scripts) ===== -->
+<!--
+<script>
+    // CHANGE: ביטלנו תלות ב-exec-url.js. יש מקור אמת יחיד ל-URL כאן.
+    // Reason: למנוע בעיות סדר-טעינה ו"כפילות" של מקורות.
+    const EXEC_URL = "https://script.google.com/macros/s/AKfycbxk7x4zpGrLlhHIQG1MdgVQtUK_fM_IP9__lTWzhKQ1a3IuBOsCWAXwn8uclnqImI-dlA/exec";
+
+    // CHANGE: מציגים את ה-URL בדשבורד (מקל על דיבוג בשטח).
+    document.addEventListener('DOMContentLoaded', () => {
+        const ep = document.getElementById('ep');
+        ep.textContent = EXEC_URL.replace(/^https?:\/\//, '');
+        ep.className = 'badge';
+    });
+
+    // ---------- Utilities ----------
+    function fmtDate(d) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    function defaultRange() {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return { from: fmtDate(start), to: fmtDate(end) };
+    }
+
+    // CHANGE: בדיקת בריאות לפני טעינת נתונים – שולח ?action=status
+    async function pingStatus() {
+        const badge = document.getElementById('ping');
+        try {
+            const r = await fetch(`${EXEC_URL}?action=status`, { cache: 'no-store', redirect: 'follow' });
+            const t = await r.text();
+            badge.textContent = r.ok ? 'Endpoint OK' : ('HTTP ' + r.status);
+            badge.className = 'badge ' + (r.ok ? 'ok' : 'err');
+            console.log('STATUS →', t);
+        } catch (e) {
+            badge.textContent = 'Status error';
+            badge.className = 'badge err';
+            console.warn('STATUS error', e);
+        }
+    }
+
+    async function fetchBookings(from, to) {
+        const url = `${EXEC_URL}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+        console.log('→ GET', url);
+
+        // CHANGE: מוסיפים cache:'no-store' ו-redirect:'follow' + לוג של גוף התשובה
+        const res = await fetch(url, { method: 'GET', cache: 'no-store', redirect: 'follow' });
+        const text = await res.text();
+        console.log('BOOKINGS raw:', text);
+
+        if (!res.ok) throw new Error('GET failed: ' + res.status);
+        let data;
+        try { data = JSON.parse(text); }
+        catch (e) { throw new Error('Bad JSON from server: ' + e.message + ' | body=' + text); }
+        return data; // מצופה: { ok:true, items:[...] }
+    }
+
+    function render(items) {
+        const q = document.getElementById('q').value.trim().toLowerCase();
+        const filtered = q ? items.filter(it => {
+            const hay = [
+                it.full_name || '',
+                it.service_name || it.service || '',
+                it.phone || '',
+                it.category || '',
+                it.email || ''
+            ].join(' ').toLowerCase();
+            return hay.includes(q);
+        }) : items;
+
+        const tbody = document.querySelector('#tbl tbody');
+        tbody.innerHTML = filtered.map(it => {
+            const d = it.preferred_date || '';
+            const t = it.preferred_time || '';
+            const n = it.full_name || '';
+            const c = it.category || '';
+            const s = it.service_name || it.service || '';
+            const p = it.phone || '';
+            const e = it.email || '';
+            return `<tr>
+                  <td class="nowrap">${d}</td>
+                  <td class="nowrap">${t}</td>
+                  <td>${n}</td>
+                  <td>${c}</td>
+                  <td>${s}</td>
+                  <td>${p}</td>
+                  <td class="right">${e}</td>
+                </tr>`;
+        }).join('');
+
+        document.getElementById('count').textContent = String(filtered.length);
+        const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+        document.getElementById('days').textContent = String(daySet.size);
+        const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+        document.getElementById('cats').textContent = String(catSet.size);
+    }
+
+    // CHANGE: זרימת הפעלה ברורה – קודם ping, אחר כך Bind, ואז טעינה ראשונית
+    document.addEventListener('DOMContentLoaded', async () => {
+        await pingStatus();
+
+        const { from, to } = defaultRange();
+        document.getElementById('from').value = from;
+        document.getElementById('to').value = to;
+
+        document.getElementById('load').addEventListener('click', async () => {
+            const s = document.getElementById('status');
+            s.textContent = 'טוען נתונים...';
+            try {
+                const data = await fetchBookings(
+                    document.getElementById('from').value || '',
+                    document.getElementById('to').value || ''
+                );
+                if (!data || !data.ok || !Array.isArray(data.items)) {
+                    s.textContent = 'שרת החזיר תשובה לא צפויה (ראה Console).';
+                    console.warn('Unexpected payload:', data);
+                    return;
+                }
+                render(data.items);
+                s.textContent = `נטענו ${data.items.length} רשומות.`;
+            } catch (err) {
+                console.warn(err);
+                s.textContent = 'שגיאה בטעינת הנתונים (בדוק doGet?action=bookings / פריסה / הרשאות).';
+            }
+        });
+
+        // טעינה אוטומטית עם פתיחת הדף
+        //document.getElementById('load').click();
+    });
+</script>
+</body>
+</html>
+
+<!--     End of 12-10-25 ver03-->
+<!--     version 12-10-25 ver02 -->
+<!--
+
+
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: .85rem
+        }
+
+        .ok {
+            background: #e6f6ec;
+            border: 1px solid #b7e2c2
+        }
+
+        .err {
+            background: #fdecea;
+            border: 1px solid #f5c2c0
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+            <span id="ep" class="badge muted" title="Endpoint in use"></span>
+            <span id="ping" class="badge muted" title="Server status"></span>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+        <!-- Filters -->
+<!--
+
+
+        <div class="filters">
+            <div class="field">
+                <label for="from">מתאריך (YYYY-MM-DD)</label>
+                <input id="from" type="date" />
+            </div>
+            <div class="field">
+                <label for="to">עד תאריך (YYYY-MM-DD)</label>
+                <input id="to" type="date" />
+            </div>
+            <div class="field">
+                <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+                <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+            </div>
+            <div class="field">
+                <button id="load" class="btn btn-techelet">טען</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+<!--
+
+
+        <div class="stats">
+            <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+            <div class="stat">ימים שונים: <b id="days">0</b></div>
+            <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+        </div>
+
+        <!-- Table -->
+<!--
+
+        <div class="table-wrap">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="nowrap">תאריך</th>
+                        <th class="nowrap">שעה</th>
+                        <th>שם</th>
+                        <th>קטגוריה</th>
+                        <th>טיפול</th>
+                        <th>טלפון</th>
+                        <th class="right">דוא״ל</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Status -->
+<!--
+
+        <p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    </main>
+
+    <!-- ===== NO external exec-url.js. Hard-coded for sanity ===== -->
+<!--
+
+    <script>
+        // *** Single source of truth (hard-coded) ***
+        const EXEC_URL = "https://script.google.com/macros/s/AKfycbyRejLcLlpPksgtWdnrqYGVCn51xbYkSP9k0ji33Ds0JcAJoxwnFAZPpjFo--nOW896fg/exec";
+        // Show the endpoint on screen for clarity
+        document.addEventListener('DOMContentLoaded', () => {
+            const ep = document.getElementById('ep');
+            ep.textContent = EXEC_URL.replace(/^https?:\/\//, '');
+            ep.className = 'badge';
+        });
+
+        // ---------- Utilities ----------
+        function fmtDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        function defaultRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return { from: fmtDate(start), to: fmtDate(end) };
+        }
+
+        async function pingStatus() {
+            const badge = document.getElementById('ping');
+            try {
+                const r = await fetch(`${EXEC_URL}?action=status`, { cache: 'no-store', redirect: 'follow' });
+                const t = await r.text();
+                badge.textContent = r.ok ? 'Endpoint OK' : ('HTTP ' + r.status);
+                badge.className = 'badge ' + (r.ok ? 'ok' : 'err');
+                console.log('STATUS →', t);
+            } catch (e) {
+                badge.textContent = 'Status error';
+                badge.className = 'badge err';
+                console.warn('STATUS error', e);
+            }
+        }
+
+        async function fetchBookings(from, to) {
+            const url = `${EXEC_URL}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+            console.log('GET →', url);
+            const res = await fetch(url, { method: 'GET', cache: 'no-store', redirect: 'follow' });
+            const text = await res.text();               // נרשום גוף לפיתוח
+            console.log('BOOKINGS raw:', text);
+            if (!res.ok) throw new Error('GET failed: ' + res.status);
+            try { return JSON.parse(text); } catch (e) {  // JSON parse בטוח
+                throw new Error('Bad JSON from server: ' + e.message + ' | body=' + text);
+            }
+        }
+
+        function render(items) {
+            const q = document.getElementById('q').value.trim().toLowerCase();
+            const filtered = q ? items.filter(it => {
+                const hay = [
+                    it.full_name || '', it.service_name || it.service || '', it.phone || '',
+                    it.category || '', it.email || ''
+                ].join(' ').toLowerCase();
+                return hay.includes(q);
+            }) : items;
+
+            const tbody = document.querySelector('#tbl tbody');
+            tbody.innerHTML = filtered.map(it => {
+                const d = it.preferred_date || '';
+                const t = it.preferred_time || '';
+                const n = it.full_name || '';
+                const c = it.category || '';
+                const s = it.service_name || it.service || '';
+                const p = it.phone || '';
+                const e = it.email || '';
+                return `<tr>
+                  <td class="nowrap">${d}</td>
+                  <td class="nowrap">${t}</td>
+                  <td>${n}</td>
+                  <td>${c}</td>
+                  <td>${s}</td>
+                  <td>${p}</td>
+                  <td class="right">${e}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('count').textContent = String(filtered.length);
+            const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+            document.getElementById('days').textContent = String(daySet.size);
+            const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+            document.getElementById('cats').textContent = String(catSet.size);
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await pingStatus(); // מציג תגית מצב
+
+            const { from, to } = defaultRange();
+            document.getElementById('from').value = from;
+            document.getElementById('to').value = to;
+
+            document.getElementById('load').addEventListener('click', async () => {
+                const s = document.getElementById('status');
+                s.textContent = 'טוען נתונים...';
+                try {
+                    const data = await fetchBookings(
+                        document.getElementById('from').value || '',
+                        document.getElementById('to').value || ''
+                    );
+                    // מצופה: אובייקט בצורה { ok:true, items:[...] }
+                    if (!data || !data.ok || !Array.isArray(data.items)) {
+                        s.textContent = 'שרת החזיר תשובה לא צפויה (ראה Console).';
+                        console.warn('Unexpected payload:', data);
+                        return;
+                    }
+                    render(data.items);
+                    s.textContent = `נטענו ${data.items.length} רשומות.`;
+                } catch (err) {
+                    console.warn(err);
+                    document.getElementById('status').textContent =
+                        'שגיאה בטעינת הנתונים (בדוק doGet?action=bookings / פריסה / הרשאות).';
+                }
+            });
+
+            // טעינה אוטומטית בפתיחת הדף
+            document.getElementById('load').click();
+        });
+    </script>
+</body>
+</html>
+<!-- end of version 12-10-25 ver02-->
+<!--   version 12-10-25-->
+<!--
+
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+        <!-- Filters -->
+<!--
+
+
+        <div class="filters">
+            <div class="field">
+                <label for="from">מתאריך (YYYY-MM-DD)</label>
+                <input id="from" type="date" />
+            </div>
+            <div class="field">
+                <label for="to">עד תאריך (YYYY-MM-DD)</label>
+                <input id="to" type="date" />
+            </div>
+            <div class="field">
+                <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+                <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+            </div>
+            <div class="field">
+                <button id="load" class="btn btn-techelet">טען</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+<!--
+
+        <div class="stats">
+            <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+            <div class="stat">ימים שונים: <b id="days">0</b></div>
+            <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+        </div>
+
+        <!-- Table -->
+<!--
+
+
+        <div class="table-wrap">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="nowrap">תאריך</th>
+                        <th class="nowrap">שעה</th>
+                        <th>שם</th>
+                        <th>קטגוריה</th>
+                        <th>טיפול</th>
+                        <th>טלפון</th>
+                        <th class="right">דוא״ל</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Status -->
+<!--
+
+
+        <p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    </main>
+
+    <!-- 1) מקור יחיד ל-EXEC_URL — חייב להיטען לפני הקוד שמתחת -->
+<!--
+
+    <script src="exec-url.js?v=6"></script>
+
+    <!-- 2) קוד הדשבורד (מסתמך על window.EXEC_URL) -->
+<!--
+
+    <script>
+        // ========== CHANGES ==========
+        // *** CHANGE #1 (Critical): מחכים ש-exec-url.js יגדיר window.EXEC_URL כדי למנוע מרוץ טעינה.
+        async function waitForExecUrl(maxMs = 2000) {
+            const start = Date.now();
+            while (!window.EXEC_URL && (Date.now() - start) < maxMs) {
+                await new Promise(r => setTimeout(r, 100));
+            }
+            return window.EXEC_URL || null;
+        }
+
+        // Utilities
+        function fmtDate(d) { const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${yyyy}-${mm}-${dd}`; }
+        function defaultRange() { const now = new Date(); const start = new Date(now.getFullYear(), now.getMonth(), 1); const end = new Date(now.getFullYear(), now.getMonth() + 1, 0); return { from: fmtDate(start), to: fmtDate(end) }; }
+
+        // *** CHANGE #2: fetch עם cache:'no-store' + redirect:'follow' כדי לראות בפועל את היעד אחרי 302
+        async function fetchBookings(from, to) {
+            const base = window.EXEC_URL;
+            const url = `${base}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+            console.log('GET →', url);
+            const res = await fetch(url, { method: 'GET', cache: 'no-store', redirect: 'follow' });
+            if (!res.ok) throw new Error('GET failed: ' + res.status);
+            return res.json(); // { ok:true, items:[...] }
+        }
+
+        function render(items) {
+            const q = document.getElementById('q').value.trim().toLowerCase();
+            const filtered = q ? items.filter(it => {
+                const hay = [it.full_name || '', it.service_name || it.service || '', it.phone || '', it.category || '', it.email || ''].join(' ').toLowerCase();
+                return hay.includes(q);
+            }) : items;
+
+            const tbody = document.querySelector('#tbl tbody');
+            tbody.innerHTML = filtered.map(it => {
+                const d = it.preferred_date || '', t = it.preferred_time || '', n = it.full_name || '', c = it.category || '', s = it.service_name || it.service || '', p = it.phone || '', e = it.email || '';
+                return `<tr>
+                  <td class="nowrap">${d}</td><td class="nowrap">${t}</td>
+                  <td>${n}</td><td>${c}</td><td>${s}</td><td>${p}</td><td class="right">${e}</td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('count').textContent = String(filtered.length);
+            const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+            document.getElementById('days').textContent = String(daySet.size);
+            const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+            document.getElementById('cats').textContent = String(catSet.size);
+        }
+
+        // *** CHANGE #3 (Critical): מריצים רק אחרי שה-DOM מוכן וגם אחרי שיש EXEC_URL.
+        document.addEventListener('DOMContentLoaded', async () => {
+            const s = document.getElementById('status');
+
+            const ok = await waitForExecUrl(2000);
+            if (!ok) {
+                console.error('EXEC_URL is undefined. Check that exec-url.js is loaded and path is correct.');
+                s.textContent = 'EXEC_URL לא נטען — בדוק שמסלול exec-url.js נכון ושהוא נטען לפני הדשבורד.';
+                return;
+            }
+            console.log('EXEC_URL =', window.EXEC_URL);
+
+            const { from, to } = defaultRange();
+            document.getElementById('from').value = from;
+            document.getElementById('to').value = to;
+
+            document.getElementById('load').addEventListener('click', async () => {
+                s.textContent = 'טוען נתונים...';
+                try {
+                    const data = await fetchBookings(
+                        document.getElementById('from').value || '',
+                        document.getElementById('to').value || ''
+                    );
+                    render(data.items || []);
+                    s.textContent = `נטענו ${data.items?.length || 0} רשומות.`;
+                } catch (err) {
+                    console.warn(err);
+                    s.textContent = 'שגיאה בטעינת הנתונים (בדוק EXEC_URL/פריסה/תאריכים).';
+                }
+            });
+
+            // טעינה אוטומטית בפתיחת הדף
+            document.getElementById('load').click();
+        });
+    </script>
+</body>
+</html>
+<!--  End of vesrion 12-10-25-->
+<!--    version 11-10-25 adding delay for exec-url.js-->
+<!--
+
+
+
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+        <!-- Filters -->
+<!--
+
+        <div class="filters">
+            <div class="field">
+                <label for="from">מתאריך (YYYY-MM-DD)</label>
+                <input id="from" type="date" />
+            </div>
+            <div class="field">
+                <label for="to">עד תאריך (YYYY-MM-DD)</label>
+                <input id="to" type="date" />
+            </div>
+            <div class="field">
+                <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+                <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+            </div>
+            <div class="field">
+                <button id="load" class="btn btn-techelet">טען</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+<!--
+
+        <div class="stats">
+            <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+            <div class="stat">ימים שונים: <b id="days">0</b></div>
+            <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+        </div>
+
+        <!-- Table -->
+<!--
+
+
+        <div class="table-wrap">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="nowrap">תאריך</th>
+                        <th class="nowrap">שעה</th>
+                        <th>שם</th>
+                        <th>קטגוריה</th>
+                        <th>טיפול</th>
+                        <th>טלפון</th>
+                        <th class="right">דוא״ל</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Status -->
+<!--
+
+        <p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    </main>
+
+    <!-- 1) מקור יחיד ל-EXEC_URL — חייב להיטען לפני הקוד שמתחת -->
+<!--
+
+    <script src="exec-url.js?v=4"></script>
+
+    <!-- 2) קוד הדשבורד (מסתמך על window.EXEC_URL) -->
+<!--
+
+    <script>
+        // ========== CHANGES ==========
+        // *** CHANGE #1 (Critical): wait until EXEC_URL is actually available.
+        // Reason: prevent race condition where dashboard code runs before exec-url.js finishes loading.
+        async function waitForExecUrl(maxMs = 2000) {
+            const start = Date.now();
+            while (!window.EXEC_URL && (Date.now() - start) < maxMs) {
+                await new Promise(r => setTimeout(r, 100));
+            }
+            return window.EXEC_URL || null;
+        }
+
+        // ---------- Utilities ----------
+        function fmtDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        function defaultRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return { from: fmtDate(start), to: fmtDate(end) };
+        }
+
+        async function fetchBookings(from, to) {
+            const base = window.EXEC_URL; // uses the global set by exec-url.js
+            const url = `${base}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+            console.log('GET →', url);
+            const res = await fetch(url, { method: 'GET', cache: 'no-store', redirect: 'follow' }); // *** CHANGE #2: cache:no-store + redirect:follow for clarity
+            if (!res.ok) throw new Error('GET failed: ' + res.status);
+            return res.json(); // { ok:true, items:[...] }
+        }
+
+        function render(items) {
+            const q = document.getElementById('q').value.trim().toLowerCase();
+            const filtered = q ? items.filter(it => {
+                const hay = [
+                    it.full_name || '',
+                    it.service_name || it.service || '',
+                    it.phone || '',
+                    it.category || '',
+                    it.email || ''
+                ].join(' ').toLowerCase();
+                return hay.includes(q);
+            }) : items;
+
+            const tbody = document.querySelector('#tbl tbody');
+            tbody.innerHTML = filtered.map(it => {
+                const d = it.preferred_date || '';
+                const t = it.preferred_time || '';
+                const n = it.full_name || '';
+                const c = it.category || '';
+                const s = it.service_name || it.service || '';
+                const p = it.phone || '';
+                const e = it.email || '';
+                return `<tr>
+                      <td class="nowrap">${d}</td>
+                      <td class="nowrap">${t}</td>
+                      <td>${n}</td>
+                      <td>${c}</td>
+                      <td>${s}</td>
+                      <td>${p}</td>
+                      <td class="right">${e}</td>
+                    </tr>`;
+            }).join('');
+
+            document.getElementById('count').textContent = String(filtered.length);
+            const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+            document.getElementById('days').textContent = String(daySet.size);
+            const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+            document.getElementById('cats').textContent = String(catSet.size);
+        }
+
+        // *** CHANGE #3 (Critical): run only after DOM is ready AND EXEC_URL exists.
+        document.addEventListener('DOMContentLoaded', async () => {
+            const s = document.getElementById('status');
+
+            // Wait up to 2s for EXEC_URL to be injected by exec-url.js
+            const ok = await waitForExecUrl(2000);
+            if (!ok) {
+                console.error('EXEC_URL is undefined. Check that exec-url.js is loaded and path is correct.');
+                s.textContent = 'EXEC_URL לא נטען — בדוק שמסלול exec-url.js נכון ושהוא נטען לפני הדשבורד.';
+                return;
+            }
+            console.log('EXEC_URL =', window.EXEC_URL);
+
+            // Fill default range (current month)
+            const { from, to } = defaultRange();
+            document.getElementById('from').value = from;
+            document.getElementById('to').value = to;
+
+            // Bind "Load" button
+            document.getElementById('load').addEventListener('click', async () => {
+                s.textContent = 'טוען נתונים...';
+                try {
+                    const data = await fetchBookings(
+                        document.getElementById('from').value || '',
+                        document.getElementById('to').value || ''
+                    );
+                    render(data.items || []);
+                    s.textContent = `נטענו ${data.items?.length || 0} רשומות.`;
+                } catch (err) {
+                    console.warn(err);
+                    s.textContent = 'שגיאה בטעינת הנתונים (בדוק EXEC_URL/פריסה/תאריכים).';
+                }
+            });
+
+            // Auto-load on open
+            document.getElementById('load').click();
+        });
+    </script>
+</body>
+</html>
+
+
+
+<!-- ver 10-10-25
+
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+        <!-- Filters -->
+<!--
+
+        <div class="filters">
+            <div class="field">
+                <label for="from">מתאריך (YYYY-MM-DD)</label>
+                <input id="from" type="date" />
+            </div>
+            <div class="field">
+                <label for="to">עד תאריך (YYYY-MM-DD)</label>
+                <input id="to" type="date" />
+            </div>
+            <div class="field">
+                <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+                <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+            </div>
+            <div class="field">
+                <button id="load" class="btn btn-techelet">טען</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+<!--
+         <div class="stats">
+            <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+            <div class="stat">ימים שונים: <b id="days">0</b></div>
+            <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+        </div>
+
+        <!-- Table -->
+<!--
+
+        <div class="table-wrap">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="nowrap">תאריך</th>
+                        <th class="nowrap">שעה</th>
+                        <th>שם</th>
+                        <th>קטגוריה</th>
+                        <th>טיפול</th>
+                        <th>טלפון</th>
+                        <th class="right">דוא״ל</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Status -->
+<!--
+
+    <p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+  </main>
+
+  <!-- 1) מקור יחיד ל-EXEC_URL — חייב להיטען לפני הקוד שמתחת -->
+<!--
+  <script src="exec-url.js?v=4"></script>
+
+    <!-- 2) קוד הדשבורד (מסתמך על window.EXEC_URL) -->
+<!--
+ <script>
+        // ---------- CONFIG ----------
+        const EXEC_URL = window.EXEC_URL;
+        if (!EXEC_URL) {
+            console.error('EXEC_URL is undefined. Make sure exec-url.js is loaded BEFORE this script.');
+        }
+
+        // ---------- Utilities ----------
+        function fmtDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        function defaultRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return { from: fmtDate(start), to: fmtDate(end) };
+        }
+
+        async function fetchBookings(from, to) {
+            const url = `${EXEC_URL}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+            const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+            if (!res.ok) throw new Error('GET failed: ' + res.status);
+            return res.json(); // { ok:true, items:[...] }
+        }
+
+        function render(items) {
+            const q = document.getElementById('q').value.trim().toLowerCase();
+            const filtered = q ? items.filter(it => {
+                const hay = [
+                    it.full_name || '',
+                    it.service_name || it.service || '',
+                    it.phone || '',
+                    it.category || '',
+                    it.email || ''
+                ].join(' ').toLowerCase();
+                return hay.includes(q);
+            }) : items;
+
+            const tbody = document.querySelector('#tbl tbody');
+            tbody.innerHTML = filtered.map(it => {
+                const d = it.preferred_date || '';
+                const t = it.preferred_time || '';
+                const n = it.full_name || '';
+                const c = it.category || '';
+                const s = it.service_name || it.service || '';
+                const p = it.phone || '';
+                const e = it.email || '';
+                return `<tr>
+              <td class="nowrap">${d}</td>
+              <td class="nowrap">${t}</td>
+              <td>${n}</td>
+              <td>${c}</td>
+              <td>${s}</td>
+              <td>${p}</td>
+              <td class="right">${e}</td>
+            </tr>`;
+            }).join('');
+
+            document.getElementById('count').textContent = String(filtered.length);
+            const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+            document.getElementById('days').textContent = String(daySet.size);
+            const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+            document.getElementById('cats').textContent = String(catSet.size);
+        }
+
+        (function init() {
+            // טווח ברירת מחדל (חודש נוכחי) + מילוי לשדות
+            const { from, to } = defaultRange();
+            document.getElementById('from').value = from;
+            document.getElementById('to').value = to;
+
+            // כפתור "טען"
+            document.getElementById('load').addEventListener('click', async () => {
+                const s = document.getElementById('status');
+                s.textContent = 'טוען נתונים...';
+                try {
+                    const data = await fetchBookings(
+                        document.getElementById('from').value || '',
+                        document.getElementById('to').value || ''
+                    );
+                    render(data.items || []);
+                    s.textContent = `נטענו ${data.items?.length || 0} רשומות.`;
+                } catch (err) {
+                    console.warn(err);
+                    s.textContent = 'שגיאה בטעינת הנתונים (בדוק EXEC_URL/גישה/תאריכים).';
+                }
+            });
+
+            // טעינה אוטומטית בפתיחת הדף
+            document.getElementById('load').click();
+        })();
+    </script>
+</body>
+</html>
+
+
+
+
+<!-- 09-10-25
+
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>דשבורד — הזמנות ולידים</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px;
+            align-items: end
+        }
+
+            .filters .field label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: .95rem;
+                color: #555
+            }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: .95rem
+        }
+
+            .table th, .table td {
+                border-bottom: 1px solid #eee;
+                padding: 8px;
+                text-align: right
+            }
+
+            .table th {
+                background: #faf7fc;
+                position: sticky;
+                top: 0;
+                z-index: 1
+            }
+
+        .table-wrap {
+            overflow: auto;
+            max-height: 66vh;
+            border: 1px solid #eee;
+            border-radius: 12px
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px
+        }
+
+        .stat {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 8px 12px
+        }
+
+        .muted {
+            color: #666;
+            font-size: .9rem
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .right {
+            text-align: left
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+    </style>
+</head>
+<body class="page">
+    <main id="content" class="section container">
+        <div class="actions-bar">
+            <a class="btn btn-techelet-outline" href="index.html">← חזרה לדף הראשי</a>
+            <h1 style="margin:0;">דשבורד הזמנות</h1>
+        </div>
+        <p class="muted">הדשבורד קורא ב-GET אל שרת ה-Apps Script ומציג נתונים כפי שנרשמו ב-Google Sheets.</p>
+
+
+
+        <!-- Filters -->
+<!--
+
+        <div class="filters">
+            <div class="field">
+                <label for="from">מתאריך (YYYY-MM-DD)</label>
+                <input id="from" type="date" />
+            </div>
+            <div class="field">
+                <label for="to">עד תאריך (YYYY-MM-DD)</label>
+                <input id="to" type="date" />
+            </div>
+            <div class="field">
+                <label for="q">חיפוש (שם / טיפול / טלפון / קטגוריה / מייל)</label>
+                <input id="q" type="search" placeholder="הקלד/י לסינון מהיר..." />
+            </div>
+            <div class="field">
+                <button id="load" class="btn btn-techelet">טען</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+<!--
+
+
+        <div class="stats">
+            <div class="stat">סה״כ רשומות: <b id="count">0</b></div>
+            <div class="stat">ימים שונים: <b id="days">0</b></div>
+            <div class="stat">קטגוריות שונות: <b id="cats">0</b></div>
+        </div>
+
+        <!-- Table -->
+<!--
+
+        <div class="table-wrap">
+            <table id="tbl" class="table">
+                <thead>
+                    <tr>
+                        <th class="nowrap">תאריך</th>
+                        <th class="nowrap">שעה</th>
+                        <th>שם</th>
+                        <th>קטגוריה</th>
+                        <th>טיפול</th>
+                        <th>טלפון</th>
+                        <th class="right">דוא״ל</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <!-- Status -->
+<!--
+
+        <p id="status" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    </main>
+
+    <!-- חייב לבוא ראשון: מספק window.EXEC_URL -->
+<!--
+
+    <script src="exec-url.js"></script>
+
+    <!-- קוד הדשבורד (מוטמע בדף; אין dashboard.js חיצוני) -->
+<!--
+
+    <script>
+        // ---------- CONFIG ----------
+        const EXEC_URL = window.EXEC_URL;
+        if (!EXEC_URL) {
+            console.error('EXEC_URL is undefined. Make sure exec-url.js is loaded BEFORE this script.');
+        }
+
+        // ---------- Utilities ----------
+        function fmtDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        function defaultRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return { from: fmtDate(start), to: fmtDate(end) };
+        }
+
+        async function fetchBookings(from, to) {
+            const url = `${EXEC_URL}?action=bookings&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+            const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+            if (!res.ok) throw new Error('GET failed: ' + res.status);
+            return res.json(); // { ok:true, items:[...] }
+        }
+
+        function render(items) {
+            const q = document.getElementById('q').value.trim().toLowerCase();
+            const filtered = q ? items.filter(it => {
+                const hay = [
+                    it.full_name || '',
+                    it.service_name || it.service || '',
+                    it.phone || '',
+                    it.category || '',
+                    it.email || ''
+                ].join(' ').toLowerCase();
+                return hay.includes(q);
+            }) : items;
+
+            const tbody = document.querySelector('#tbl tbody');
+            tbody.innerHTML = filtered.map(it => {
+                const d = it.preferred_date || '';
+                const t = it.preferred_time || '';
+                const n = it.full_name || '';
+                const c = it.category || '';
+                const s = it.service_name || it.service || '';
+                const p = it.phone || '';
+                const e = it.email || '';
+                return `<tr>
+                          <td class="nowrap">${d}</td>
+                          <td class="nowrap">${t}</td>
+                          <td>${n}</td>
+                          <td>${c}</td>
+                          <td>${s}</td>
+                          <td>${p}</td>
+                          <td class="right">${e}</td>
+                        </tr>`;
+            }).join('');
+
+            document.getElementById('count').textContent = String(filtered.length);
+            const daySet = new Set(filtered.map(it => it.preferred_date || '')); daySet.delete('');
+            document.getElementById('days').textContent = String(daySet.size);
+            const catSet = new Set(filtered.map(it => it.category || '')); catSet.delete('');
+            document.getElementById('cats').textContent = String(catSet.size);
+        }
+
+        (function init() {
+            const { from, to } = defaultRange();
+            document.getElementById('from').value = from;
+            document.getElementById('to').value = to;
+
+            document.getElementById('load').addEventListener('click', async () => {
+                const s = document.getElementById('status');
+                s.textContent = 'טוען נתונים...';
+                try {
+                    const data = await fetchBookings(
+                        document.getElementById('from').value || '',
+                        document.getElementById('to').value || ''
+                    );
+                    render(data.items || []);
+                    s.textContent = `נטענו ${data.items?.length || 0} רשומות.`;
+                } catch (err) {
+                    console.warn(err);
+                    s.textContent = 'שגיאה בטעינת הנתונים (בדוק EXEC_URL/גישה/תאריכים).';
+                }
+            });
+        })();
+
+
+    </script>
+
+
+    <!-- מקור יחיד ל-EXEC_URL -->
+<!--
+
+    <script src="./exec-url.js?v=4"></script>
+
+    <!-- קוד הדשבורד שלך שכבר משתמש ב-window.EXEC_URL מגיע אחרי זה -->
+<!--
+
+    <script>
+        console.log('EXEC_URL =', window.EXEC_URL);
+        // מכאן הלאה הקוד הקיים שלך (fetchBookings/render/init וכו')
+    </script>
+
+
+</body>
+</html>
+
+
+
